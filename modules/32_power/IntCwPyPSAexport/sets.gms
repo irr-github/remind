@@ -1,0 +1,63 @@
+
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/32_power/IntCwPyPSAexport/sets.gms
+
+***------------------------------------------------------------
+***                  PyPSA-Eur coupling
+***------------------------------------------------------------
+
+*** REMIND sets used for the PyPSA coupling
+sets
+    tPy32(ttot)                 "Years coupled to PyPSA, later adjusted to exclude 2025 if cm_startyear is 2030"
+        /2025, 2030, 2035, 2040, 2045, 2050, 2055, 2060, 2070, 2080, 2090, 2100, 2110, 2130, 2150/
+
+$ifthen "%c32_pypsa_multiregion%" == "on"
+    regPy32(all_regi)           "Regions coupled to PyPSA"
+        /CHA/
+$else
+    regPy32(all_regi)           "Regions coupled to PyPSA"
+        /CHA/
+$endif
+
+    tePy32(all_te)              "Electricity generation technologies coupled to PyPSA"
+    /biochp, bioigcc, bioigccc, ngcc, ngccc, gaschp, igcc, igccc, pc, coalchp, tnrs, fnrs, ngt, windoff, dot, windon, hydro, spv/  !! TODO: What about CSP and geohdr?
+
+    tePyDisp32(all_te)          "Dispatchable electricity technologies coupled to PyPSA (without grades), used for peak residual load"
+        /biochp, bioigcc, bioigccc, ngcc, ngccc, gaschp, igcc, igccc, pc, coalchp, tnrs, fnrs, ngt, dot/
+
+    tePyVRE32(all_te)           "Variable renewable electricity technologies coupled to PyPSA (with grades), used for potentials if applicable"
+        /windoff, windon, hydro, spv/
+
+    entyPePy32(all_enty)        "Primary energy carriers for which prices are coupled to PyPSA"
+        /peoil, pegas, pecoal, peur, pebiolc/
+
+    !! TODO: Rename?
+    teStoreTransPy32(all_te)    "Storage and transmission technologies coupled to PyPSA"
+        /elh2, h2turb, h2stor, btin, btout, btstor/
+
+    teStorePy32(all_te)         "Storage technologies coupled to PyPSA (not conversion, but size of store in TWh)"
+        /h2stor, btstor/
+
+    rep32                       "Generic set for PyPSA reporting"
+        /1*20/
+;
+
+* Remove year 2025 if cm_startyear is 2030
+If (cm_startyear = 2030, tPy32("2025") = no);
+
+*** Sets to import PyPSA data
+sets
+    loadPy32                    "Loads for which specific electricity prices / demand-side markups are reported in PyPSA"
+        /"electrolysis"/
+;
+
+*** Make alises for use in equations
+alias(tePy32,tePy32_2);
+alias(regPy32,regPy32_2);
+
+*** EOF ./modules/32_power/IntCwPyPSAexport/sets.gms

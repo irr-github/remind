@@ -21,5 +21,6 @@
 
 *###################### R SECTION START (MODULETYPES) ##########################
 $Ifi "%power%" == "IntC" $include "./modules/32_power/IntC/realization.gms"
+$Ifi "%power%" == "IntCwPyPSAexport" $include "./modules/32_power/IntCwPyPSAexport/realization.gms"
 *###################### R SECTION END (MODULETYPES) ############################
 *** EOF ./modules/32_power/module.gms

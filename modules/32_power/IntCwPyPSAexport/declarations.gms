@@ -1,0 +1,158 @@
+*** |  (C) 2006-2024 Potsdam Institute for Climate Impact Research (PIK)
+*** |  authors, and contributors see CITATION.cff file. This file is part
+*** |  of REMIND and licensed under AGPL-3.0-or-later. Under Section 7 of
+*** |  AGPL-3.0, you are granted additional permissions described in the
+*** |  REMIND License Exception, version 1.0 (see LICENSE file).
+*** |  Contact: remind@pik-potsdam.de
+*** SOF ./modules/32_power/IntCwPyPSAexport/declarations.gms
+
+parameters
+    p32_grid_factor(all_regi)						"multiplicative factor that scales total grid requirements down in comparatively small or homogeneous regions like Japan, Europe or India"
+    p32_gridexp(all_regi,all_te)					"exponent that determines how grid requirement per kW increases with market share of wind and solar. 1 means specific marginal costs increase linearly"
+    p32_storexp(all_regi,all_te)					"exponent that determines how curtailment and storage requirements per kW increase with market share of wind and solar. 1 means specific marginal costs increase linearly"
+    p32_shCHP(ttot,all_regi)            			"upper boundary of chp electricity generation"
+    p32_factorStorage(all_regi,all_te)      		"multiplicative factor that scales total curtailment and storage requirements up or down in different regions for different technologies (e.g. down for PV in regions where high solar radiation coincides with high electricity demand)"
+    f32_storageCap(char, all_te)                    "multiplicative factor between dummy seel<-->h2 technologies and storXXX technologies"
+    p32_storageCap(all_te,char)                     "multiplicative factor between dummy seel<-->h2 technologies and storXXX technologies"
+    p32_PriceDurSlope(all_regi,all_te)              "slope of price duration curve used for calculation of electricity price for flexible technologies, determines how fast electricity price declines at lower capacity factors"
+    o32_dispatchDownPe2se(ttot,all_regi,all_te)     "output parameter to check by how much a pe2se te reduced its output below the normal, in % of the normal output."
+    p32_shThresholdTotVREAddIntCost(ttot)           "Total VRE share threshold above which additional integration challenges arise. Increases with time as eg in 2030, there is still little experience with managing systems with 80% VRE share. Unit: Percent"
+    p32_FactorAddIntCostTotVRE                      "Multiplicative factor that influences how much the total VRE share increases integration challenges"
+    p32_phaseInElh2VREcap(ttot)                     "phase-in factor for electrolysis capacities built from stored VRE electricity, scale up from 2030 to 2040"
+    p32_flexSeelShare_slope(ttot,all_regi,all_te)   "Slope of relationship between average electricity price for flexible technology and share of this technology in total electricity demand. Unit: [ % percentage of average electricity price / % share in electricity demand]."
+;
+
+scalars
+s32_storlink                                        "how strong is the influence of two similar renewable energies on each other's storage requirements (1= complete, 4= rather small)" /3/
+;
+
+positive variables
+    v32_shStor(ttot,all_regi,all_te)         		"share of seel production from a VRE te that needs to be stored based on this te's share. Unit: ~Percent"
+    v32_storloss(ttot,all_regi,all_te)         		"total energy loss from storage for a given technology [TWa]"
+    vm_shSeEl(ttot,all_regi,all_te)			     	"new share of electricity production in % [%]"
+    v32_testdemSeShare(ttot,all_regi,all_te)        "test variable for tech share of SE electricity demand"
+    v32_TotVREshare(ttot,all_regi)                  "Total VRE share as calculated by summing shSeEl. Unit: Percent"
+    v32_shAddIntCostTotVRE(ttot,all_regi)           "Variable containing how much the total VRE share is above the threshold - needed to calculate additional integation costs due to total VRE share."
+    vm_shDemSeel(ttot,all_regi,all_te)              "Share of electricity demand per technology in total electricity demand"
+;
+
+equations
+    q32_balSe(ttot,all_regi,all_enty)				"balance equation for electricity secondary energy"
+    q32_usableSe(ttot,all_regi,all_enty)			"calculate usable se before se2se and MP/XP (without storage)"
+    q32_usableSeTe(ttot,all_regi,entySe,all_te)   	"calculate usable se produced by one technology (vm_usableSeTe)"
+    q32_limitCapTeStor(ttot,all_regi,teStor)		"calculate the storage capacity required by vm_storloss"
+    q32_limitCapTeChp(ttot,all_regi)                "capacitiy constraint for chp electricity generation"
+    q32_limitCapTeGrid(ttot,all_regi)          		"calculate the additional grid capacity required by VRE"
+    q32_shSeEl(ttot,all_regi,all_te)         		"calculate share of electricity production of a technology (vm_shSeEl)"
+    q32_shStor(ttot,all_regi,all_te)                "equation to calculate v32_shStor"
+    q32_storloss(ttot,all_regi,all_te)              "equation to calculate vm_storloss, and - as vm_storloss determines the storage capacity - also the general integration challenges"
+    q32_operatingReserve(ttot,all_regi)  			"operating reserve for necessary flexibility"
+    q32_h2turbVREcapfromTestor(tall,all_regi)       "calculate capacities of dummy seel<--h2 technology from storXXX technologies"
+    q32_h2turbVREcapfromTestorUp(ttot,all_regi)     "constraint h2turbVRE hydrogen turbines to be only built together with storage capacities"
+    q32_elh2VREcapfromTestor(tall,all_regi)         "calculate capacities of dummy seel-->h2 technology from storXXX technologies"
+    q32_flexAdj(ttot,all_regi,all_te)               "calculate flexibility benefit or cost per flexible technology to be used by flexibility tax"
+    q32_flexPriceShareMin(ttot,all_regi,all_te)     "calculate miniumum share of average electricity that flexible technologies can see"
+    q32_flexPriceShareVRE(ttot,all_regi,all_te)     "calculate miniumum share of average electricity that flexible technologies can see given the current VRE share"
+    q32_flexPriceShare(ttot,all_regi,all_te)        "calculate share of average electricity price that flexible technologies see given a certain VRE share and share of electrolysis in total electricity demand"
+    q32_flexPriceBalance(ttot,all_regi)             "constraint such that flexible electricity prices balanance to average electricity price"
+    q32_TotVREshare(ttot,all_regi)                  "calculate total VRE share"
+    q32_shAddIntCostTotVRE(ttot,all_regi)           "calculate how much total VRE share is above threshold value"
+    q32_shDemSeel(ttot,all_regi,all_te)             "calculate share of electricity demand per technology in total electricity demand"
+;
+
+variables
+v32_flexPriceShare(ttot,all_regi,all_te)            "share of average electricity price that flexible technologies see [share: 0...1]"
+v32_flexPriceShareVRE(ttot,all_regi,all_te)         "possible minimum of share of average electricity price that flexible technologies see given the current VRE share [share: 0...1]"   
+v32_flexPriceShareMin(ttot,all_regi,all_te)         "possible minimum of share of average electricity price that flexible technologies see [share: 0...1]"
+
+;
+
+
+***------------------------------------------------------------
+***                  Declarations for PyPSA
+***------------------------------------------------------------
+
+*** We categorise declarationf into the following categories:
+*** (1) PyPSA export: Parameters that are written to REMIND2PyPSAEUR.gdx in postsolve.gms
+*** (2) PyPSA import: Parameters that are read from PyPSAEUR2REMIND.gdx in postsolve.gms (import calc parameters are derived from these)
+*** (3) PyPSA coupling: Parameters/Variables/Equations that are used within the coupling, mostly in equations.gms
+*** (4) PyPSA reporting: Parameters that are calculated for reporting and plotting
+parameters
+    !! Parameters for exporting data to PyPSA-Eur
+    p32_load(ttot,all_regi)                                         "PyPSA export: Electricity load [TWa]"
+    p32_load_EVs(ttot,all_regi)                                     "PyPSA export: Electricity load for EVs, corrected to corresponding SE electricity load [TWa]"
+    p32_load_heating(ttot,all_regi)                                 "PyPSA export: Electricity load for buildings heating, corrected to corresponding SE electricity load [TWa]"
+    p32_ElecH2Demand(ttot,all_regi)                                 "PyPSA export: Electrolytic hydrogen demand outside the power sector [TWa]"
+    p32_preInvCap(ttot,all_regi,all_te)                             "PyPSA export: Pre-investment capacities [TW for generation/link, TWh for storage]"
+    p32_preInvCap_iter(iteration,ttot,all_regi,all_te)              "PyPSA export: Pre-investment capacities in iterations [TW for generation/link, TWh for storage]"
+    p32_preInvCapAvg(ttot,all_regi,all_te)                          "PyPSA export: Pre-investment capacities averaged over iterations [TW for generation/link, TWh for storage]"
+    p32_discountRate(ttot)                                          "PyPSA export: Interest rate / discount rate aggregated across all regions in regPy32 [1]"
+    p32_capCostwAdjCost(ttot,all_regi,all_te)                       "PyPSA export: Specific capital costs plus adjustment costs [T$/TW_out for generation/link, T$/TWh for storage]"
+    p32_capCostwAdjCostScaled(ttot,all_regi,all_te)                 "PyPSA export: Specific capital costs + adj costs. Nuclear and oild disencentivised for PyPSA"   
+    p32_PEPrice_iter(iteration,ttot,all_regi,all_enty)              "PyPSA export: PE price in iterations [T$/TWa, nuclear: T$/Mt]"
+    p32_ElecH2Demand(ttot,all_regi)                                 "PyPSA export: Electrolytic hydrogen demand outside the power sector [TWa]"
+    p32_PEPriceAvg(ttot,all_regi,all_enty)                          "PyPSA export: PE price averaged over iterations [T$/TWa, nuclear: T$/Mt]"
+    p32_weightGen(ttot,all_regi,all_te)                             "PyPSA export: Weights for generation technologies [TWa]"
+    p32_weightStor(ttot,all_regi,all_te)                            "PyPSA export: Weights for storage technologies, currently electrolysis and hydrogen turbines [TWa]"
+    p32_weightPEprice(ttot,all_regi,all_enty)                       "PyPSA export: Weights for primary energy prices [TWa]"
+    p32_hydroCap(ttot,all_regi)                                     "PyPSA export: Hydro capacity [TW]"
+    p32_hydroGen(ttot,all_regi)                                     "PyPSA export: Hydro generation [TWa]"
+    !! Parameters for importing data from PyPSA-Eur
+    p32_PyPSA_CF(ttot,all_regi,all_te)                              "PyPSA import: Capacity factors [1]"
+    p32_PyPSA_CF_iter(iteration,ttot,all_regi,all_te)               "PyPSA import calc: Capacity factors in iterations [1]"
+    p32_PyPSA_CFAvg(ttot,all_regi,all_te)                           "PyPSA import calc: Capacity factors averaged over iterations [1]"
+    p32_PyPSA_MarkupSupply(ttot,all_regi,all_te)                    "PyPSA import: Markups for electricity technologies according to PyPSA-Eur [$/MWh]"
+    p32_PyPSA_MarkupSupply_iter(iteration,ttot,all_regi,all_te)     "PyPSA import calc: Markups in iterations [$/MWh]"
+    p32_PyPSA_MarkupSupplyAvg(ttot,all_regi,all_te)                 "PyPSA import calc: Markups averaged over iterations [$/MWh]"
+    p32_PyPSA_MarkupDemand(ttot,all_regi,loadPy32)                  "PyPSA import: Markups for electricity consumption technologies according to PyPSA-Eur [$/MWh]"
+    p32_PyPSA_MarkupDemand_iter(iteration,ttot,all_regi,loadPy32)   "PyPSA import calc: Markups in iterations [$/MWh]"
+    p32_PyPSA_MarkupDemandAvg(ttot,all_regi,loadPy32)               "PyPSA import calc: Markups averaged over iterations [$/MWh]"
+    p32_PyPSA_PeakResLoadRel(ttot,all_regi)                         "PyPSA import: Peak residual load relative to average load [1]"
+    p32_PyPSA_shPe2seel(ttot,all_regi,all_te)                       "PyPSA import: Electricity generation share by technology within region [1]"
+    p32_PyPSA_H2TurbRel(ttot,all_regi)                              "PyPSA import: Hydrogen turbine supply relative to total load [1]"
+    p32_PyPSA_BatteryDischargeRel(ttot,all_regi)                    "PyPSA import: Battery discharge relative to total load [1]"
+    p32_PyPSA_Trade(ttot,all_regi,all_regi)                         "PyPSA import: Electricity exports from region 1 to region 2 [MWh]" 
+    p32_PyPSA_TradePriceImport(ttot,all_regi,all_regi)              "PyPSA import: Price for electricity imports paid by region 2 due to trade with region 1 [$/MWh]"
+    p32_PyPSA_TradePriceExport(ttot,all_regi,all_regi)              "PyPSA import: Price for electricity exports received by region 1 due to trade with region 2 [$/MWh]"
+    p32_PyPSA_Potential(ttot,all_regi,all_te)                       "PyPSA import: VRE potentials by technology within region [MW]"
+    p32_PyPSA_shPe2seelRegi(ttot,all_regi)                          "PyPSA import: Electricity generation share across coupled regions [1]"
+    p32_PyPSA_AF(ttot,all_regi,all_te)                              "PyPSA import: Availability factors [1]"
+    p32_PyPSA_GridLossesRel(ttot,all_regi)                          "PyPSA import: Transmission losses relative to total load [1]"
+    p32_PyPSA_OptCap(ttot,all_regi,all_te)                          "PyPSA import: Optimal capacities [MW for generators/links, MWh for stores]. Attention: Links w.r.t. input!"
+    p32_PyPSA_DQ_CF(ttot,all_regi,all_te,all_te)                    "PyPSA import: Difference quotient of capacity factors w.r.t perturbations of capacity [1/MW]"
+    p32_PyPSA_DQ_MarkupSupply(ttot,all_regi,all_te,all_te)          "PyPSA import: Difference quotient of supply-side markups w.r.t perturbations of capacity [($/MWh)/MW]"
+    !! Parameters for the PyPSA coupling
+    p32_anticipation_CF(ttot, all_regi,all_te)                      "PyPSA coupling: Manual anticipation factor for the capacity factor [1]"
+    p32_anticipation_MV(all_regi,all_te)                            "PyPSA coupling: Manual cnticipation factor for the market value [1]"
+    p32_usableSeDispForeign(ttot,all_regi)                          "PyPSA coupling: Foreign usable SE electricity generation, without own consumption, without imports/exports [TWa]"
+    p32_hydroCorrectionFactor(ttot,all_regi)                        "PyPSA coupling: Hydro correction factor, defined as availability factor / capacity factor of previous iteration [1]"
+    sm_PyPSA_eq                                                     "PyPSA coupling: Boolean that activates PyPSA coupling equations (1 = on, 0 = off)"
+    s32_checkPrice                                                  "PyPSA coupling: Boolean that checks if budget equation is binding (1 = yes, 0 = no)"
+    s32_checkPrice_iter(iteration)                                  "PyPSA coupling: s32_checkPrice in iterations"
+    s32_anticipationFactorFadeOut                                   "PyPSA coupling: Multiplicative factor to fade out ancitipation factors [1]"
+    s32_PyPSA_called(iteration)                                     "PyPSA coupling: Boolean that tracks if PyPSA was called over iterations, necessary for averaging (1 = yes, 0 = no)"
+    !! Switches for the PyPSA coupling that are based on compile switches, but need to be passed to PyPSA and therefore require another parameter
+    !! c32_pypsa_cfg_perturb                                           "PyPSA coupling: Switch for perturbation of capacities, set automatically (1 = on, 0 = off)"
+    c32_adjCost                                                     "PyPSA coupling: Switch controlling whether adj costs added to CAPEX (0 = off, 1= avg, 2 = marg)"
+    !! Parameters for the PyPSA coupling reporting
+    p32_PeakResLoadShadowPrice(ttot,all_regi,all_te)                "PyPSA reporting: Shadow price of peak residual load constraint, used for plotting LCOEs vs. market values [T$/TWa]"
+    p32_ElecBalance(ttot,all_regi,rep32)                            "PyPSA reporting: Electricity balance [TWa]"
+;
+
+*** Positive variables for the PyPSA coupling
+positive variables
+    v32_load(ttot,all_regi)                                         "PyPSA coupling: Electricity load [TWa]"
+    v32_pe2seel(ttot,all_regi)                                      "PyPSA coupling: Domestic generation of SE electricity from primary energy carriers for all coupled technologies [TWa]"
+    v32_pe2seelTe(ttot,all_regi,all_te)                             "PyPSA coupling: Domestic generation of SE electricity from primary energy carriers by coupled technology [TWa]"
+    v32_shPe2seel(ttot,all_regi,all_te)                             "PyPSA coupling/export: Share of domestic generation of SE electricity from primary energy carriers by coupled technology [1]"
+    v32_gridLosses(ttot,all_regi)                                   "PyPSA coupling: Grid losses [TWa]"
+;
+
+*** Equations for the PyPSA coupling
+equations
+    q32_load(ttot,all_regi,all_enty)                                "PyPSA coupling: Calculate electricity load"
+!!    q32_pe2seel(ttot,all_regi)                                      "PyPSA coupling: Calculate v32_pe2seel"
+!!    q32_pe2seelTe(ttot,all_regi,all_te)                             "PyPSA coupling: Calculate v32_pe2seelTe"
+!!    q32_shPe2seel(ttot,all_regi,all_te)                             "PyPSA coupling: Calculate v32_shpe2seel"
+;
+*** EOF ./modules/32_power/IntCwPyPSAexport/declarations.gms

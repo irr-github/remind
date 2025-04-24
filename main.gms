@@ -321,7 +321,8 @@ $setglobal fossil  grades2poly        !! def = grades2poly
 *'---------------------    32_power    ----------------------------------------
 *'
 *' * (IntC)      :    Power sector formulation with Integration Cost (IntC) markups and curtailment for VRE integration - linearly increasing with VRE share -, and fixed capacity factors for dispatchable power plants
-$setglobal power  IntC        !! def = IntC
+*' * (IntCwPyPSAexport)   :    Power sector formulation that is identical to IntC but exports a GDX that can be read by PyPSA work
+$setglobal power  IntCwPyPSAexport        !! def = IntC
 *'---------------------    33_CDR       ----------------------------------------
 *'
 *' * (portfolio) : CDR options added via switches: cm_33[option abbreviation]
@@ -1406,6 +1407,14 @@ $setGlobal cm_VREminShare    off !! def = off
 ***     amount of Carbon Capture and Storage (including DACCS and BECCS) is limited to a maximum of 2GtCO2 per yr globally, and 250 Mt CO2 per yr in EU28.
 ***   This switch only works for model native regions. If you want to apply it to a group region use cm_implicitQttyTarget instead.
 $setGlobal cm_CCSmaxBound    off  !! def = off
+
+*' 32 power Include adjustment cost into capital costs for PyPSA
+*' 0 = off, 1 = average adjustment costs, 2 = marginal adjustment costs
+parameter
+  c32_adjCost                  "Include adjustment cost into capital costs for PyPSA"
+;
+c32_adjCost = 0; !! def = 0  !! regexp = [0-2]
+
 *** cm_33_EW_maxShareOfCropland
 *** limit the share of cropland on which rocks can be spread. Affects the maximum total amount of rocks weathering on fields.
 *** example: "GLO 1, LAM 0.5" limits amount of rocks weathering on cropland in LAM to 50% of max value if all LAM cropland were used.

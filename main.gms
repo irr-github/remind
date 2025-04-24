@@ -1414,6 +1414,10 @@ parameter
   c32_adjCost                  "Include adjustment cost into capital costs for PyPSA"
 ;
 c32_adjCost = 0; !! def = 0  !! regexp = [0-2]
+parameter
+  c32_NucOilDisincentivFactor  "Nuclear and oil disincentive factor for PyPSA"
+;
+c32_NucOilDisincentivFactor = 2; !!  regexp = [0-5]
 
 *** cm_33_EW_maxShareOfCropland
 *** limit the share of cropland on which rocks can be spread. Affects the maximum total amount of rocks weathering on fields.

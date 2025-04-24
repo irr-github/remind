@@ -87,8 +87,12 @@ parameters
     p32_preInvCap_iter(iteration,ttot,all_regi,all_te)              "PyPSA export: Pre-investment capacities in iterations [TW for generation/link, TWh for storage]"
     p32_preInvCapAvg(ttot,all_regi,all_te)                          "PyPSA export: Pre-investment capacities averaged over iterations [TW for generation/link, TWh for storage]"
     p32_discountRate(ttot)                                          "PyPSA export: Interest rate / discount rate aggregated across all regions in regPy32 [1]"
-    p32_capCostwAdjCost(ttot,all_regi,all_te)                       "PyPSA export: Specific capital costs plus adjustment costs [T$/TW_out for generation/link, T$/TWh for storage]"
-    p32_capCostwAdjCostScaled(ttot,all_regi,all_te)                 "PyPSA export: Specific capital costs + adj costs. Nuclear and oild disencentivised for PyPSA"   
+    p32_capCost(ttot,all_regi,all_te)                               "PyPSA export: Specific capital costs w/o adj costs [T$/TW_out for generation/link, T$/TWh for storage]"
+    p32_capCostScaled(ttot,all_regi,all_te)                         "PyPSA export: Specific capital costs w/o costs. Nuclear and oild disencentivised for PyPSA"   
+    p32_capCostwMargAdjCost(ttot,all_regi,all_te)                   "PyPSA export: Specific capital costs plus marginal adjustment costs [T$/TW_out for generation/link, T$/TWh for storage]"
+    p32_capCostwMargAdjCostScaled(ttot,all_regi,all_te)             "PyPSA export: Specific capital costs + marginal adj costs. Nuclear and oild disencentivised for PyPSA"   
+    p32_capCostwAvgAdjCost(ttot,all_regi,all_te)                    "PyPSA export: Specific capital costs plus avg adjustment costs [T$/TW_out for generation/link, T$/TWh for storage]"
+    p32_capCostwAvgAdjCostScaled(ttot,all_regi,all_te)              "PyPSA export: Specific capital costs + avg adj costs. Nuclear and oild disencentivised for PyPSA"   
     p32_PEPrice_iter(iteration,ttot,all_regi,all_enty)              "PyPSA export: PE price in iterations [T$/TWa, nuclear: T$/Mt]"
     p32_ElecH2Demand(ttot,all_regi)                                 "PyPSA export: Electrolytic hydrogen demand outside the power sector [TWa]"
     p32_PEPriceAvg(ttot,all_regi,all_enty)                          "PyPSA export: PE price averaged over iterations [T$/TWa, nuclear: T$/Mt]"
@@ -134,6 +138,7 @@ parameters
     !! Switches for the PyPSA coupling that are based on compile switches, but need to be passed to PyPSA and therefore require another parameter
     !! c32_pypsa_cfg_perturb                                           "PyPSA coupling: Switch for perturbation of capacities, set automatically (1 = on, 0 = off)"
     c32_adjCost                                                     "PyPSA coupling: Switch controlling whether adj costs added to CAPEX (0 = off, 1= avg, 2 = marg)"
+    c32_NucOilDisincentivFac                                        "PyPSA coupling: Factor for disincentivising nuclear and oil, set automatically (1 = on, 0 = off)"
     !! Parameters for the PyPSA coupling reporting
     p32_PeakResLoadShadowPrice(ttot,all_regi,all_te)                "PyPSA reporting: Shadow price of peak residual load constraint, used for plotting LCOEs vs. market values [T$/TWa]"
     p32_ElecBalance(ttot,all_regi,rep32)                            "PyPSA reporting: Electricity balance [TWa]"

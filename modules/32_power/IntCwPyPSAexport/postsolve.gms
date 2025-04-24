@@ -67,24 +67,32 @@ p32_discountRate(ttot)$(tPy32(ttot) and ttot.val le 2100) =
 p32_discountRate(ttot)$(ttot.val gt 2100) = 0.03;
 
 !! Specific capital costs plus adjustment costs
-if ((c32_adjCost eq 0),  !! No adjustment costs
-  p32_capCostwAdjCost(t,regi,te)$(tPy32(t) and regPy32(regi) and (tePy32(te) or teStoreTransPy32(te))) = 
-    vm_costTeCapital.l(t,regi,te) + EPS;
-elseif (c32_adjCost eq 1),  !! Average adjustment costs
-  p32_capCostwAdjCost(t,regi,te)$(tPy32(t) and regPy32(regi) and (tePy32(te) or teStoreTransPy32(te))) = 
-    max(0, vm_costTeCapital.l(t,regi,te) + o_avgAdjCostInv(t,regi,te)$( sum(te2rlf(te,rlf), vm_deltaCap.l(t,regi,te,rlf)) ge 1e-5 )) + EPS;
-elseif (c32_adjCost eq 2),  !! Marginal adjustment costs
-  p32_capCostwAdjCost(t,regi,te)$(tPy32(t) and regPy32(regi) and (tePy32(te) or teStoreTransPy32(te))) = 
-    max(0, vm_costTeCapital.l(t,regi,te) + o_margAdjCostInv(t,regi,te)$( sum(te2rlf(te,rlf), vm_deltaCap.l(t,regi,te,rlf)) ge 1e-5 )) + EPS;
-);
+!! w/o adjustment costs
+p32_capCost(t,regi,te)$(tPy32(t) and regPy32(regi) and (tePy32(te) or teStoreTransPy32(te)))
+ = 
+ vm_costTeCapital.l(t,regi,te) + EPS;
+!! w Average adjustment costs
+p32_capCostwAvgAdjCost(t,regi,te)$(tPy32(t) and regPy32(regi) and (tePy32(te) or teStoreTransPy32(te))) 
+ = 
+ max(0, vm_costTeCapital.l(t,regi,te) + o_avgAdjCostInv(t,regi,te)$( sum(te2rlf(te,rlf), vm_deltaCap.l(t,regi,te,rlf)) ge 1e-5 )) + EPS;
+!! Marginal adjustment costs
+p32_capCostwMargAdjCost(t,regi,te)$(tPy32(t) and regPy32(regi) and (tePy32(te) or teStoreTransPy32(te))) = 
+  max(0, vm_costTeCapital.l(t,regi,te) + o_margAdjCostInv(t,regi,te)$( sum(te2rlf(te,rlf), vm_deltaCap.l(t,regi,te,rlf)) ge 1e-5 )) + EPS;
 
 
 !! HACK: Disincentivise oil and nuclear by increasing capital costs by factor 2
 !! Oil and nuclear are sometimes used by PyPSA in 2025 only, which doesn't make sense as the investment wouldn't be profitable
 !! TODO: Find a way to properly include foresight of key metrics (capacity factors, markups) into capital cost
-p32_capCostwAdjCostScaled(t,regi,te) = p32_capCostwAdjCost(t,regi,te);
-p32_capCostwAdjCostScaled(t,regi,te)$(tPy32(t) and regPy32(regi) and (sameas(te,"dot") or sameas(te,"tnrs") or sameas(te, "fnrs")) ) = 
-    2 * p32_capCostwAdjCost(t,regi,te) + EPS;
+!! Possible solution: use intertemp weighed carbon cost
+p32_capCostwMargAdjCostScaled(t,regi,te) = p32_capCostwMargAdjCost(t,regi,te);
+p32_capCostwMargAdjCostScaled(t,regi,te)$(tPy32(t) and regPy32(regi) and (sameas(te,"dot") or sameas(te,"tnrs") or sameas(te, "fnrs")) ) = 
+    2 * p32_capCostwMargAdjCost(t,regi,te) + EPS;
+p32_capCostwAvgAdjCostScaled(t,regi,te) = p32_capCostwAvgAdjCost(t,regi,te);
+p32_capCostwAvgAdjCostScaled(t,regi,te)$(tPy32(t) and regPy32(regi) and (sameas(te,"dot") or sameas(te,"tnrs") or sameas(te, "fnrs")) ) = 
+    2 * p32_capCostwAvgAdjCost(t,regi,te) + EPS;
+p32_capCostScaled(t,regi,te) = p32_capCost(t,regi,te);
+p32_capCostScaled(t,regi,te)$(tPy32(t) and regPy32(regi) and (sameas(te,"dot") or sameas(te,"tnrs") or sameas(te, "fnrs")) ) = 
+    2 * p32_capCost(t,regi,te) + EPS;
 
 
 !! Export REMIND data for PyPSA (REMIND2PyPSAEUR.gdx)
@@ -97,7 +105,9 @@ Execute_Unload "REMIND2PyPSAEUR.gdx",
   !! Additional electrolytic hydrogen demand (from outside power sector)
   p32_ElecH2Demand,
   !! Capital cost components
-  p32_capCostwAdjCost, pm_data, p32_discountRate, p32_capCostwAdjCostScaled,
+  p32_capCost, p32_capCostScaled, p32_capCostwMargAdjCost, p32_capCostwMargAdjCostScaled,
+  p32_capCostwAvgAdjCost, p32_capCostwAvgAdjCostScaled,
+  pm_data, p32_discountRate, c32_adjCost
   !! Marginal cost components
   pm_eta_conv, pm_dataeta, p32_PEPriceAvg, pe2se, p_priceCO2, f_dataemiglob,
   !! Weights to calculate weighted averages
@@ -111,6 +121,44 @@ Execute_Unload "REMIND2PyPSAEUR.gdx",
   v32_shPe2seel
 ;
 option epsToZero=off;
+
+
+## EXPORT GDX TO PICKLE
+embeddedCode Python:
+PARAMS = ["tPy32", "regPy32", "tePy32", "p32_load", "p32_ElecH2Demand", "p32_capCost",
+ "p32_capCostScaled", "p32_capCostwMargAdjCost", "p32_capCostwMargAdjCostScaled", "p32_capCostwAvgAdjCost",
+  "p32_capCostwAvgAdjCostScaled", "pm_data", "p32_discountRate", "c32_adjCost", "pm_eta_conv", "pm_dataeta", 
+  "p32_PEPriceAvg", "pe2se", "p_priceCO2", "f_dataemiglob", "p32_weightGen", "p32_weightStor", "p32_weightPEprice", 
+  "p32_preInvCapAvg", "p32_hydroCap", "p32_hydroGen", "v32_shPe2seel"]
+import pandas as pd
+from numpy import __version__
+
+gams.printLog("Exporting PyPSA relevant data. Warning: export is to Pickle, which requires a matching numpy version")
+gams.printLog(f"Gams numpy version is {__version__}")
+
+def param_to_pandas(par_name:str):
+    par = gams.get(par_name)
+    df = pd.DataFrame(list(par), columns=['Index', 'Value'])
+    df.set_index(pd.MultiIndex.from_tuples(df['Index']), inplace=True)
+    df.drop(columns=['Index'], inplace=True)
+
+    # add parname to index
+    df["variable"] = par_name
+    df = df.set_index("variable", append=True)
+    df.index = df.index.reorder_levels(order=[-1]+[i for i in range(len(df.index.levels)-1)])
+    df = df.astype(float)
+    return df
+
+df = pd.DataFrame()
+for par in PARAMS:
+    try:
+        df_ = param_to_pandas(par)
+        df_.to_csv(f"pypsa_export/{par}.csv")
+        df = pd.concat([df, df_], axis =0)
+    except Exception as e:
+        gams.printLog(f"Error {e} - param {par} was skipped")
+df.to_pickle("mytest.pkl")
+endEmbeddedCode
 
 !! Temporarily store and then set numeric round format and number of decimals
 sm_tmp  = logfile.nr;

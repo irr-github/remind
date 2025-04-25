@@ -95,6 +95,68 @@ p32_capCostScaled(t,regi,te)$(tPy32(t) and regPy32(regi) and (sameas(te,"dot") o
     2 * p32_capCost(t,regi,te) + EPS;
 
 
+$call mkdir pypsa_export
+
+* export region mappings
+EmbeddedCode Connect:
+- GAMSReader:
+    symbols:
+      - name: regi2iso
+- CSVWriter:
+    file: "pypsa_export/region_mappings.csv"
+    name: regi2iso
+    valueSubstitutions: {'EPS': 0}
+endEmbeddedCode
+
+** EXPORT PyPSA relevant params/vars/other TO HDF5
+embeddedCode Python:
+PARAMS = ["tPy32", "regPy32", "tePy32", "p32_load", "p32_ElecH2Demand", "p32_capCost",
+ "p32_capCostScaled", "p32_capCostwMargAdjCost", "p32_capCostwMargAdjCostScaled", "p32_capCostwAvgAdjCost",
+  "p32_capCostwAvgAdjCostScaled", "pm_data", "p32_discountRate", "c32_adjCost", "pm_eta_conv", "pm_dataeta", 
+  "p32_PEPriceAvg", "pe2se", "p_priceCO2", "f_dataemiglob", "p32_weightGen", "p32_weightStor", "p32_weightPEprice", 
+  "p32_preInvCapAvg", "p32_hydroCap", "p32_hydroGen", "v32_shPe2seel"]
+import pandas as pd
+from numpy import __version__
+import os
+gams.printLog("=== Exporting PyPSA relevant data. Warning: export is to Pickle, which requires a matching numpy version ====")
+gams.printLog(os.getcwd())
+gams.printLog(f"Gams numpy version is {__version__}")
+
+def param_to_pandas(par_name:str)->pd:
+    """ Convert GAMS parameter to pandas dataframe
+    """
+    par = gams.get(par_name)
+    gams.printLog(f"Exporting {par_name} with {list(par)}")
+    
+    if not list(par):
+        gams.printLog(f"Parameter {par_name} is empty and skipped")
+        return pd.DataFrame()
+
+    df = pd.DataFrame(list(par), columns=['Index', 'Value'])
+    df.set_index(pd.MultiIndex.from_tuples(df['Index']), inplace=True)
+    df.drop(columns=['Index'], inplace=True)
+
+    # add parname to index  
+    df["variable"] = par_name
+    df = df.set_index("variable", append=True)
+    df.index = df.index.reorder_levels(order=[-1]+[i for i in range(len(df.index.levels)-1)])
+    df = df.astype(float)
+    return df
+
+# loop over params and export to csv. Concat to giant pickle
+df = pd.DataFrame()
+for par in PARAMS:
+    try:
+        df_ = param_to_pandas(par)
+        df_.to_csv(f".pypsa_export/{par}.csv")
+        df = pd.concat([df, df_], axis =0)
+    except Exception as e:
+        gams.printLog(f"Error {e} - param {par} was skipped")
+df.to_pickle(".pypsa_export/REMIND_export.pkl")
+
+endEmbeddedCode
+
+
 !! Export REMIND data for PyPSA (REMIND2PyPSAEUR.gdx)
 Execute_Unload "REMIND2PyPSAEUR.gdx",
   !! -- REMIND to PyPSA-Eur --
@@ -120,45 +182,10 @@ Execute_Unload "REMIND2PyPSAEUR.gdx",
   !! Generation shares in REMIND to downscale generation shares in PyPSA
   v32_shPe2seel
 ;
+
 option epsToZero=off;
 
 
-## EXPORT GDX TO PICKLE
-embeddedCode Python:
-PARAMS = ["tPy32", "regPy32", "tePy32", "p32_load", "p32_ElecH2Demand", "p32_capCost",
- "p32_capCostScaled", "p32_capCostwMargAdjCost", "p32_capCostwMargAdjCostScaled", "p32_capCostwAvgAdjCost",
-  "p32_capCostwAvgAdjCostScaled", "pm_data", "p32_discountRate", "c32_adjCost", "pm_eta_conv", "pm_dataeta", 
-  "p32_PEPriceAvg", "pe2se", "p_priceCO2", "f_dataemiglob", "p32_weightGen", "p32_weightStor", "p32_weightPEprice", 
-  "p32_preInvCapAvg", "p32_hydroCap", "p32_hydroGen", "v32_shPe2seel"]
-import pandas as pd
-from numpy import __version__
-
-gams.printLog("Exporting PyPSA relevant data. Warning: export is to Pickle, which requires a matching numpy version")
-gams.printLog(f"Gams numpy version is {__version__}")
-
-def param_to_pandas(par_name:str):
-    par = gams.get(par_name)
-    df = pd.DataFrame(list(par), columns=['Index', 'Value'])
-    df.set_index(pd.MultiIndex.from_tuples(df['Index']), inplace=True)
-    df.drop(columns=['Index'], inplace=True)
-
-    # add parname to index
-    df["variable"] = par_name
-    df = df.set_index("variable", append=True)
-    df.index = df.index.reorder_levels(order=[-1]+[i for i in range(len(df.index.levels)-1)])
-    df = df.astype(float)
-    return df
-
-df = pd.DataFrame()
-for par in PARAMS:
-    try:
-        df_ = param_to_pandas(par)
-        df_.to_csv(f"pypsa_export/{par}.csv")
-        df = pd.concat([df, df_], axis =0)
-    except Exception as e:
-        gams.printLog(f"Error {e} - param {par} was skipped")
-df.to_pickle("mytest.pkl")
-endEmbeddedCode
 
 !! Temporarily store and then set numeric round format and number of decimals
 sm_tmp  = logfile.nr;

@@ -68,6 +68,7 @@ v32_flexPriceShareMin(ttot,all_regi,all_te)         "possible minimum of share o
 ;
 
 
+
 ***------------------------------------------------------------
 ***                  Declarations for PyPSA
 ***------------------------------------------------------------
@@ -87,6 +88,8 @@ parameters
     p32_preInvCap_iter(iteration,ttot,all_regi,all_te)              "PyPSA export: Pre-investment capacities in iterations [TW for generation/link, TWh for storage]"
     p32_preInvCapAvg(ttot,all_regi,all_te)                          "PyPSA export: Pre-investment capacities averaged over iterations [TW for generation/link, TWh for storage]"
     p32_discountRate(ttot)                                          "PyPSA export: Interest rate / discount rate aggregated across all regions in regPy32 [1]"
+    p32_cap(ttot,all_regi,all_te)                                   "PyPSA export: Pre-investment capacities [TW for generation/link, TWh for storage]"
+    p32_cap_iter(iteration,ttot,all_regi,all_te)                    "PyPSA export: Pre-investment capacities in iterations [TW for generation/link, TWh for storage]"
     p32_capCost(ttot,all_regi,all_te)                               "PyPSA export: Specific capital costs w/o adj costs [T$/TW_out for generation/link, T$/TWh for storage]"
     p32_capCostScaled(ttot,all_regi,all_te)                         "PyPSA export: Specific capital costs w/o costs. Nuclear and oild disencentivised for PyPSA"   
     p32_capCostwMargAdjCost(ttot,all_regi,all_te)                   "PyPSA export: Specific capital costs plus marginal adjustment costs [T$/TW_out for generation/link, T$/TWh for storage]"
@@ -125,6 +128,8 @@ parameters
     p32_PyPSA_OptCap(ttot,all_regi,all_te)                          "PyPSA import: Optimal capacities [MW for generators/links, MWh for stores]. Attention: Links w.r.t. input!"
     p32_PyPSA_DQ_CF(ttot,all_regi,all_te,all_te)                    "PyPSA import: Difference quotient of capacity factors w.r.t perturbations of capacity [1/MW]"
     p32_PyPSA_DQ_MarkupSupply(ttot,all_regi,all_te,all_te)          "PyPSA import: Difference quotient of supply-side markups w.r.t perturbations of capacity [($/MWh)/MW]"
+    p32_capAvg(ttot,all_regi,all_te)                                "PyPSA export: Average capacity of generation and storage technologies"
+    p32_PyPSA_AdjCost(ttot,all_regi,all_te)                         "PyPSA import: Adjustment costs for generation and storage technologies [T$/TW_out for generation/link, T$/TWh for storage]"
     !! Parameters for the PyPSA coupling
     p32_anticipation_CF(ttot, all_regi,all_te)                      "PyPSA coupling: Manual anticipation factor for the capacity factor [1]"
     p32_anticipation_MV(all_regi,all_te)                            "PyPSA coupling: Manual cnticipation factor for the market value [1]"
@@ -134,14 +139,21 @@ parameters
     s32_checkPrice                                                  "PyPSA coupling: Boolean that checks if budget equation is binding (1 = yes, 0 = no)"
     s32_checkPrice_iter(iteration)                                  "PyPSA coupling: s32_checkPrice in iterations"
     s32_anticipationFactorFadeOut                                   "PyPSA coupling: Multiplicative factor to fade out ancitipation factors [1]"
+
     s32_PyPSA_called(iteration)                                     "PyPSA coupling: Boolean that tracks if PyPSA was called over iterations, necessary for averaging (1 = yes, 0 = no)"
     !! Switches for the PyPSA coupling that are based on compile switches, but need to be passed to PyPSA and therefore require another parameter
     !! c32_pypsa_cfg_perturb                                           "PyPSA coupling: Switch for perturbation of capacities, set automatically (1 = on, 0 = off)"
     c32_adjCost                                                     "PyPSA coupling: Switch controlling whether adj costs added to CAPEX (0 = off, 1= avg, 2 = marg)"
+    c32_avg_rm2py                                                   "PyPSA coupling: Switch for averaing over iters (1 = on, 0 = off)"
     c32_NucOilDisincentivFac                                        "PyPSA coupling: Factor for disincentivising nuclear and oil, set automatically (1 = on, 0 = off)"
     !! Parameters for the PyPSA coupling reporting
     p32_PeakResLoadShadowPrice(ttot,all_regi,all_te)                "PyPSA reporting: Shadow price of peak residual load constraint, used for plotting LCOEs vs. market values [T$/TWa]"
     p32_ElecBalance(ttot,all_regi,rep32)                            "PyPSA reporting: Electricity balance [TWa]"
+    !! parameters that will be vatiables in the bidirectional coupling
+    p32_pe2seelTe(ttot,all_regi,all_te)                             "PyPSA coupling: Domestic generation of SE electricity from primary energy carriers by coupled technology [TWa]"  
+    p32_pe2seel(ttot,all_regi)                                      "PyPSA coupling/export: Share of domestic generation of SE electricity from primary energy carriers by coupled technology [1]"
+    p32_shPe2seel(ttot,all_regi,all_te)                             "PyPSA coupling/export: Share of domestic generation of SE electricity from primary energy carriers by coupled technology [1]"
+
 ;
 
 *** Positive variables for the PyPSA coupling

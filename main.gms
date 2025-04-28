@@ -1419,6 +1419,18 @@ parameter
 ;
 c32_NucOilDisincentivFactor = 2; !!  regexp = [0-5]
 
+parameter
+c32_avg_rm2py   "Whether to average the remind data over iterations for exports to PyPSA"
+;
+c32_avg_rm2py =0; !! def = 0 !! regexp = [0-1]
+
+Parameter
+    c32_iter_fullCap           "Iteration in which not the pre-investment capacity, but the full capacity is passed to PyPSA"
+;
+c32_iter_fullCap = 200;  !! def = 200 !! regexp = is.numeric
+*' Iteration in which not the pre-investment capacity, but the full capacity is passed to PyPSA
+*' An arbitrarily large value means that the pre-investment capacity is always used
+
 *** cm_33_EW_maxShareOfCropland
 *** limit the share of cropland on which rocks can be spread. Affects the maximum total amount of rocks weathering on fields.
 *** example: "GLO 1, LAM 0.5" limits amount of rocks weathering on cropland in LAM to 50% of max value if all LAM cropland were used.

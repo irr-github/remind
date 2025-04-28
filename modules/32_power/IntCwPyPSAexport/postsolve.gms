@@ -20,6 +20,13 @@ loop(t,
   );
 );
 
+
+!! ================   PYPSA EXPORT =======================
+
+!! Track iterations in which PyPSA was executed, this is necessary to calculate averages
+s32_PyPSA_called(iteration) = 1;
+
+
 *** Get electricity load
 p32_load(t,regi)$(tPy32(t) and regPy32(regi)) = v32_load.l(t,regi);
 
@@ -47,6 +54,62 @@ p32_load_heating(t,regi)$(tPy32(t) AND regPy32(regi)) =
       + pm_cesdata(t,regi,in,"offset_quantity")
   ) / pm_eta_conv(t,regi,"tdels")
 ;
+
+*** Calculate free capacities that are passed to PyPSA
+if (iteration.val lt c32_iter_fullCap,  !! Use pre-investment capacities
+  p32_cap(t,regi,te)$(tPy32(t) AND regPy32(regi) AND (tePy32(te) OR teStoreTransPy32(te)) AND NOT sameas(te, "hydro")) =
+      max((vm_cap.l(t,regi,te,"1")
+    - vm_deltaCap.l(t,regi,te,"1") * pm_ts(t) * ( 1 - vm_capEarlyReti.l(t,regi,te) )),
+        1E-6);  !! Minimum capacity of 1 MW to avoid issues in PyPSA-Eur's RCL implementation
+else  !! Use full capacities
+  p32_cap(t,regi,te)$(tPy32(t) AND regPy32(regi) AND (tePy32(te) OR teStoreTransPy32(te)) AND NOT sameas(te, "hydro")) =
+    max(vm_cap.l(t,regi,te,"1"), 1E-6);  !! Minimum capacity of 1 MW to avoid issues in PyPSA-Eur's RCL implementation
+);
+
+** Primary energy
+p32_pe2seel(t,regi) =	sum(pe2se(enty,"seel",tePy32), vm_prodSe.l(t,regi,enty,"seel",tePy32));
+
+*** Weights (supply or cap) for disaggregation (of n->1 generators and fuel mappings)
+p32_pe2seelTe(t,regi,te) = sum(pe2se(all_enty,"seel",te), vm_prodSe.l(t,regi,all_enty,"seel",te) );
+* spacer = for debug
+p32_weightGen(t,regi,te)$(tPy32(t) AND regPy32(regi) AND tePy32(te)) = p32_pe2seelTe(t,regi,te) + EPS;
+p32_weightPEprice(t,regi,entyPe)$(tPy32(t) AND regPy32(regi) AND entyPePy32(entyPe)) = vm_prodPe.l(t,regi,entyPe) + EPS;
+
+** Primary energy shares
+p32_shPe2seel(t, regi, te) = p32_pe2seelTe(t,regi,te)/(p32_pe2seel(t,regi)+ EPS);
+*** Track PE price over iterations
+p32_PEPrice_iter(iteration,ttot,regi,entyPe) = pm_PEPrice(ttot,regi,entyPe);
+
+*** Track pre-investment capacities over iterations
+p32_cap_iter(iteration,t,regi,te) = p32_cap(t,regi,te);
+
+!! REMIND to PyPSA-Eur: Calculate averages to reduce oscillations
+!! (i) Capacities
+!! (ii) Primary energy (PE) prices
+!! The idea behind averaging follows three steps:
+!! (1) Allow at least x iterations (until max(c32_startIter_PyPSA, x)) without averaging
+!! (2) Allow another y iterations (until max(c32_startIter_PyPSA, x) + y) without averaging 
+!! (3) Afterwards take the average of the previous y iterations, where y should be an even number
+!! Currently set x to 3 and y to 2
+
+!! Implement step (1) and (2): Use non-averaged values always if c32_avg_rm2py = 0
+if (( c32_avg_rm2py eq 0 ) or ( iteration.val lt 4 ),  !!
+  !! Non-averaged capacities
+  p32_capAvg(t,regi,te)$(tPy32(t) and regPy32(regi) and (tePy32(te) OR teStoreTransPy32(te))) = p32_cap(t,regi,te) + EPS;
+  !! Non-averaged PE prices, limited to 0 and 200 EUR/MWh (for uranium 200 T$/Mt corresponds to 1752 $/kg)
+  p32_PEPriceAvg(t,regi,entyPe)$(tPy32(t) and regPy32(regi) and entyPePy32(entyPe)) = 
+      min(200 * sm_TWa_2_MWh/1E12, max(0, pm_PEPrice(t,regi,entyPe))) + EPS;
+!! Implement step (3): Use averaged values only if c32_avg_rm2py = 1 and (because of elseif) only if iteration >= c32_startIter_PyPSA + x + y - 1 
+elseif (c32_avg_rm2py eq 1),
+    !! Average capacities over past y iterations
+    p32_capAvg(t,regi,te)$(tPy32(t) and regPy32(regi) and (tePy32(te) OR teStoreTransPy32(te))) =
+      sum(iteration2$(iteration2.val gt (iteration.val - 4)), s32_PyPSA_called(iteration2) * p32_cap_iter(iteration2,t,regi,te)) /
+      sum(iteration2$(iteration2.val gt (iteration.val - 4)), s32_PyPSA_called(iteration2)) + EPS;
+    !! Average non-negative PE prices over past y iterations, limited to 0 and 200 EUR/MWh (for uranium 200 T$/Mt corresponds to 1752 $/kg)
+    p32_PEPriceAvg(t,regi,entyPe)$(tPy32(t) and regPy32(regi) and entyPePy32(entyPe)) =
+      sum(iteration2$(iteration2.val gt (iteration.val - 4)), s32_PyPSA_called(iteration2) * min(200 * sm_TWa_2_MWh/1E12, max(0, p32_PEPrice_iter(iteration2,t,regi,entyPe)))) /
+      sum(iteration2$(iteration2.val gt (iteration.val - 4)), s32_PyPSA_called(iteration2)) + EPS;
+);
 
 
 !! Capital interest rate aggregated for all regions in regPy32 (PyPSA-Eur has no regional costs yet)
@@ -114,7 +177,7 @@ PARAMS = ["tPy32", "regPy32", "tePy32", "p32_load", "p32_ElecH2Demand", "p32_cap
  "p32_capCostScaled", "p32_capCostwMargAdjCost", "p32_capCostwMargAdjCostScaled", "p32_capCostwAvgAdjCost",
   "p32_capCostwAvgAdjCostScaled", "pm_data", "p32_discountRate", "c32_adjCost", "pm_eta_conv", "pm_dataeta", 
   "p32_PEPriceAvg", "pe2se", "p_priceCO2", "f_dataemiglob", "p32_weightGen", "p32_weightStor", "p32_weightPEprice", 
-  "p32_preInvCapAvg", "p32_hydroCap", "p32_hydroGen", "v32_shPe2seel"]
+  "p32_preInvCapAvg", "p32_hydroCap", "p32_hydroGen", "v32_shPe2seel", "pm_emifac"]
 import pandas as pd
 from numpy import __version__
 import os
@@ -163,7 +226,7 @@ Execute_Unload "REMIND2PyPSAEUR.gdx",
   !! Coupled time steps, regions and technologies
   tPy32, regPy32, tePy32,
   !! Electricity load
-  p32_load,
+  p32_load, 
   !! Additional electrolytic hydrogen demand (from outside power sector)
   p32_ElecH2Demand,
   !! Capital cost components
@@ -175,12 +238,14 @@ Execute_Unload "REMIND2PyPSAEUR.gdx",
   !! Weights to calculate weighted averages
   p32_weightGen, p32_weightStor, p32_weightPEprice,
   !! Pre-installed capacities
-  p32_preInvCapAvg,
+  p32_preInvCapAvg, p32_cap, p32_cap_iter
   !! Hydro capacities and generation (special treatment in PyPSA)
   p32_hydroCap, p32_hydroGen,
   !! -- PyPSA-Eur to REMIND -- 
   !! Generation shares in REMIND to downscale generation shares in PyPSA
-  v32_shPe2seel
+  p32_pe2seelTe, 
+  !! Share of el
+  p32_pe2seelTe, p32_shPe2seel
 ;
 
 option epsToZero=off;

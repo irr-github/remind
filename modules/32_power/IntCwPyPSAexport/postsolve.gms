@@ -209,61 +209,50 @@ logfile.nr = 1;
 logfile.nd = 0;
 
 
+EmbeddedCode Python:
+"""
+Programatic loop over gams connect CSV export for all export PARAMS
+"""
+import yaml, os
+from gams.connect import ConnectDatabase
 
 
-
-** EXPORT PyPSA relevant params/vars/other TO HDF5
-embeddedCode Python:
-
-import pandas as pd
-from numpy import __version__
-gams.printLog("=== Exporting PyPSA relevant data. Warning: export is to Pickle, which requires a matching numpy version ====")
-gams.printLog(f"Gams numpy version is {__version__}")
-
-PARAMS = ["c_model_version", "tPy32", "regPy32", "tePy32", "p32_load", "p32_ElecH2Demand", "p32_capCost",
- "p32_capCostScaled", "p32_capCostwMargAdjCost", "p32_capCostwMargAdjCostScaled", "p32_capCostwAvgAdjCost",
+PARAMS = ["tPy32", "regPy32", "tePy32", "p32_load", "p32_ElecH2Demand", "p32_capCost", "ttot",
+  "p32_capCostScaled", "p32_capCostwMargAdjCost", "p32_capCostwMargAdjCostScaled", "p32_capCostwAvgAdjCost",
   "p32_capCostwAvgAdjCostScaled", "pm_data", "p32_discountRate", "c32_adjCost", "pm_eta_conv", "pm_dataeta", 
   "p32_PEPriceAvg", "pe2se", "p_priceCO2", "f_dataemiglob", "p32_weightGen", "p32_weightStor", "p32_weightPEprice", 
-  "p32_preInvCapAvg", "p32_hydroCap", "p32_hydroGen", "p32_pe2seelTe", "p32_shPe2seel", "p32_pe2seel", "pm_emifac"]
+  "p32_preInvCapAvg", "p32_hydroCap", "p32_hydroGen", "v32_shPe2seel", "p32_capCostwAdjCost", "p32_capCostwAdjCostScaled"]
 
+# TODO get this from config/gams globals
+# TODO add iter
+dir = "./pypsa_export"
+if not os.path.isdir(dir):
+    os.mkdir(dir)
 
-def param_to_pandas(par_name:str)->pd.DataFrame:
-    """ Convert GAMS parameter to pandas dataframe
-    """
-    par = gams.get(par_name)
-   
-    # need diff treatment for dimension 1 params
-    if par._dim >1:
-        df = pd.DataFrame(list(par), columns=['Index', 'Value'])
-        df.set_index(pd.MultiIndex.from_tuples(df['Index']), inplace=True)
-        df.drop(columns=['Index'], inplace=True)
-        # add par_name to index
-        df["variable"] = par_name
-        df = df.set_index("variable", append=True)
-        df.index = df.index.reorder_levels(order=[-1]+[i for i in range(len(df.index.levels)-1)])
-    else:
-        df = pd.DataFrame(par, columns = ["dim1", "Value"])
-        df["variable"] = par_name
-        df = df.set_index("variable", append=True)
-    
-    df.loc[:, "Value"] = df.Value.astype(float)
+# single gams connect yaml nstruction
+export_instruct = '''
+    - GAMSReader:
+        symbols:
+          - name: {par}
+    - CSVWriter:
+        file: {dir}/{par}.csv
+        name: {par}
+        valueSubstitutions: {'EPS': 0}
+    '''
 
-    return df
-
-# loop over params and export to csv. Concat to giant pickle
-df = pd.DataFrame()
+# Loop
+cdb = ConnectDatabase(gams._system_directory, ecdb=gams)
 for par in PARAMS:
+    par_instr = yaml.safe_load(export_instruct.replace("{par}",par).replace("{dir}",dir))
     try:
-        df_ = param_to_pandas(par)
-        df_.to_csv(f"./pypsa_export/{par}.csv")
-        df = pd.concat([df, df_], axis =0)
+        # the gams connect export
+        cdb.execute(par_instr)
     except Exception as e:
-        gams.printLog(f"Error {e} - param {par} was skipped")
-df.to_pickle("./pypsa_export/REMIND_export.pkl")
+        gams.printLog(f"Error par {par} skipped: {e}")
 
 endEmbeddedCode
 
-* export region mappings
+* export region mappings, could be done as part of 
 EmbeddedCode Connect:
 - GAMSReader:
     symbols:

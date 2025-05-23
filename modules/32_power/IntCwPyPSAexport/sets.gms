@@ -26,7 +26,6 @@ $endif
 
     tePy32(all_te)              "Electricity generation technologies coupled to PyPSA"
     /biochp, bioigcc, bioigccc, ngcc, ngccc, gaschp, igcc, igccc, pc, coalchp, tnrs, fnrs, ngt, windoff, dot, windon, hydro, spv/  !! TODO: What about CSP and geohdr?
-
     tePyDisp32(all_te)          "Dispatchable electricity technologies coupled to PyPSA (without grades), used for peak residual load"
         /biochp, bioigcc, bioigccc, ngcc, ngccc, gaschp, igcc, igccc, pc, coalchp, tnrs, fnrs, ngt, dot/
 

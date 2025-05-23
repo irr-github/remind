@@ -74,6 +74,7 @@ p32_pe2seelTe(t,regi,te) = sum(pe2se(all_enty,"seel",te), vm_prodSe.l(t,regi,all
 * spacer = for debug
 p32_weightGen(t,regi,te)$(tPy32(t) AND regPy32(regi) AND tePy32(te)) = p32_pe2seelTe(t,regi,te) + EPS;
 p32_weightPEprice(t,regi,entyPe)$(tPy32(t) AND regPy32(regi) AND entyPePy32(entyPe)) = vm_prodPe.l(t,regi,entyPe) + EPS;
+* TODO weight CAP
 
 ** Primary energy shares
 p32_shPe2seel(t, regi, te) = p32_pe2seelTe(t,regi,te)/(p32_pe2seel(t,regi)+ EPS);
@@ -171,8 +172,9 @@ endEmbeddedCode
 !! Export REMIND data for PyPSA (REMIND2PyPSAEUR.gdx)
 Execute_Unload "REMIND2PyPSAEUR.gdx",
   !! -- REMIND to PyPSA-Eur --
+  c_model_version, c_expname,
   !! Coupled time steps, regions and technologies
-  c_model_version,
+  all_te,
   tPy32, regPy32, tePy32,
   !! Electricity load
   p32_load, 
@@ -212,6 +214,8 @@ logfile.nd = 0;
 EmbeddedCode Python:
 """
 Programatic loop over gams connect CSV export for all export PARAMS
+
+WARNING: the remind2pypsa ETL expects the file name to be the symbol/parameter name
 """
 import yaml, os
 from gams.connect import ConnectDatabase
@@ -219,9 +223,10 @@ from gams.connect import ConnectDatabase
 
 PARAMS = ["tPy32", "regPy32", "tePy32", "p32_load", "p32_ElecH2Demand", "p32_capCost", "ttot",
   "p32_capCostScaled", "p32_capCostwMargAdjCost", "p32_capCostwMargAdjCostScaled", "p32_capCostwAvgAdjCost",
-  "p32_capCostwAvgAdjCostScaled", "pm_data", "p32_discountRate", "c32_adjCost", "pm_eta_conv", "pm_dataeta", 
+  "p32_capCostwAvgAdjCostScaled", "pm_data", "p32_discountRate", "c32_adjCost", "pm_eta_conv", "pm_dataeta", "pm_emifac",
   "p32_PEPriceAvg", "pe2se", "p_priceCO2", "f_dataemiglob", "p32_weightGen", "p32_weightStor", "p32_weightPEprice", 
-  "p32_preInvCapAvg", "p32_hydroCap", "p32_hydroGen", "v32_shPe2seel", "p32_capCostwAdjCost", "p32_capCostwAdjCostScaled"]
+  "p32_preInvCapAvg", "p32_hydroCap", "p32_hydroGen", "v32_shPe2seel", "p32_capCostwAdjCost", "p32_capCostwAdjCostScaled",
+  "c_model_version", "c_expname"]
 
 # TODO get this from config/gams globals
 # TODO add iter
@@ -262,4 +267,5 @@ EmbeddedCode Connect:
     name: regi2iso
     valueSubstitutions: {'EPS': 0}
 endEmbeddedCode
+
 *** EOF ./modules/32_power/IntCwPyPSAexport/postsolve.gms

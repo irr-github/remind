@@ -226,7 +226,7 @@ PARAMS = ["tPy32", "regPy32", "tePy32", "p32_load", "p32_ElecH2Demand", "p32_cap
   "p32_capCostwAvgAdjCostScaled", "pm_data", "p32_discountRate", "c32_adjCost", "pm_eta_conv", "pm_dataeta", "pm_emifac",
   "p32_PEPriceAvg", "pe2se", "p_priceCO2", "f_dataemiglob", "p32_weightGen", "p32_weightStor", "p32_weightPEprice", 
   "p32_preInvCapAvg", "p32_hydroCap", "p32_hydroGen", "v32_shPe2seel", "p32_capCostwAdjCost", "p32_capCostwAdjCostScaled",
-  "c_model_version", "c_expname"]
+  "c_model_version", "c_expname", "pm_taxCO2eq"]
 
 # TODO get this from config/gams globals
 # TODO add iter
